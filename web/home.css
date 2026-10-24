@@ -162,7 +162,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   border-radius: 34px;
   background: -webkit-linear-gradient(top, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.5));
   background: linear-gradient(rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.5));
-  box-shadow: 0 6px 26px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+  box-shadow: 0 6px 26px rgba(0, 0, 0, 0.1);
   color: #1D1D1F;
   -webkit-transition: -webkit-transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.2), box-shadow 0.2s, background-color 0.17s;
   transition: transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.2), box-shadow 0.2s, background-color 0.17s;
@@ -188,7 +188,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .night .round {
   background: -webkit-linear-gradient(top, rgba(40, 40, 44, 0.8), rgba(17, 17, 19, 0.62));
   background: linear-gradient(rgba(40, 40, 44, 0.8), rgba(17, 17, 19, 0.62));
-  box-shadow: 0 6px 26px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  box-shadow: 0 6px 26px rgba(0, 0, 0, 0.3);
   color: rgba(255, 255, 255, 0.92);
 }
 .night .round.focus { background: #FFF; color: #1D1D1F; }
@@ -293,12 +293,12 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   border-radius: 62px;
   background: -webkit-linear-gradient(top, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.4));
   background: linear-gradient(rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.4));
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.12), inset 0 1.5px 0 rgba(255, 255, 255, 0.95), inset 0 0 0 1px rgba(255, 255, 255, 0.55);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.12);
 }
 .night #platter {
   background: -webkit-linear-gradient(top, rgba(34, 34, 38, 0.72), rgba(17, 17, 19, 0.6));
   background: linear-gradient(rgba(34, 34, 38, 0.72), rgba(17, 17, 19, 0.6));
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.32), inset 0 1.5px 0 rgba(255, 255, 255, 0.14), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.32);
 }
 
 #tiles {
@@ -368,12 +368,12 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .glass {
   background: -webkit-linear-gradient(top, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.66));
   background: linear-gradient(rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.66));
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1), inset 0 1.5px 0 rgba(255, 255, 255, 0.95), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
 }
 .night .glass {
   background: -webkit-linear-gradient(top, rgba(38, 38, 42, 0.78), rgba(17, 17, 19, 0.64));
   background: linear-gradient(rgba(38, 38, 42, 0.78), rgba(17, 17, 19, 0.64));
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), inset 0 1.5px 0 rgba(255, 255, 255, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
 }
 
 .key {
@@ -465,6 +465,25 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .night .panel .tline { color: rgba(255, 255, 255, 0.66); }
 .panel .tstate.warn { color: #B25000; background: rgba(255, 149, 0, 0.2); }
 .night .panel .tstate.warn { color: #FFB340; background: rgba(255, 159, 10, 0.18); }
+/* Compact cards (the top row, above the shelf) */
+.panel.small { top: 24px; height: 212px; border-radius: 26px; }
+.panel.small .head { left: 28px; top: 16px; font-size: 21px; }
+.panel.small .side { right: 28px; top: 18px; font-size: 17px; }
+.panel.small .coin { left: 28px; right: 28px; height: 32px; font-size: 23px; }
+.panel.small .coin .n { font-size: 22px; top: 1px; }
+.panel.small .coin .p { right: 92px; top: 2px; font-size: 21px; }
+.panel.small .coin .c { top: 2px; width: 78px; height: 27px; line-height: 27px; border-radius: 14px; font-size: 16px; }
+#weather.small .now { left: 28px; top: 50px; height: 76px; }
+#weather.small .now .sym { width: 42px; height: 42px; vertical-align: 8px; margin-right: 14px; }
+#weather.small .now .temp { font-size: 74px; line-height: 76px; }
+#weather.small .cond { left: 28px; top: 128px; font-size: 22px; }
+#weather.small .range { left: 28px; top: 160px; font-size: 18px; }
+#weather.small .sun.narrow { left: 28px; top: 184px; font-size: 18px; }
+#traffic.small .bigtime { left: 28px; top: 44px; font-size: 84px; line-height: 96px; }
+#traffic.small .bigtime small { font-size: 26px; }
+#traffic.small .tstate { right: 28px; top: 62px; height: 32px; line-height: 32px; padding: 0 16px; font-size: 19px; }
+#traffic.small .tline { left: 28px; top: 146px; font-size: 19px; }
+#traffic.small .tline + .tline { top: 176px; }
 .dots { position: absolute; left: 0; right: 0; top: 1034px; text-align: center; }
 .dots span { display: inline-block; width: 10px; height: 10px; margin: 0 7px; border-radius: 5px; background: rgba(255, 255, 255, 0.25); }
 .dots span.on { background: rgba(255, 255, 255, 0.85); }
@@ -551,12 +570,16 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 #saver .clock .date { margin-top: 10px; padding-left: 14px; font-size: 34px; font-weight: 600; letter-spacing: 0.02em; color: rgba(200, 76, 54, 0.42); }
 #saver .clock .title { margin-top: 18px; padding-left: 14px; font-size: 22px; font-weight: 500; color: rgba(200, 76, 54, 0.28); }
 #saver .info:empty { display: none; }
-#saver .wx { position: relative; height: 210px; margin-bottom: 24px; }
+#saver .wx { position: relative; height: 210px; margin-bottom: 14px; }
 #saver .wx .sym { position: absolute; left: 0; top: 20px; width: 84px; height: 84px; background: rgba(200, 76, 54, 0.5); }
 #saver .wx .wt { position: absolute; left: 118px; top: 0; }
 #saver .wx .deg { font-size: 112px; font-weight: 600; line-height: 112px; letter-spacing: -0.02em; color: rgba(200, 76, 54, 0.62); }
 #saver .wx .cond { margin-top: 8px; font-size: 26px; font-weight: 600; color: rgba(200, 76, 54, 0.4); }
 #saver .wx .mm { position: absolute; left: 0; top: 168px; font-size: 26px; font-weight: 600; color: rgba(200, 76, 54, 0.4); }
+#saver .tr { position: relative; height: 70px; margin-bottom: 18px; font-size: 34px; font-weight: 600; }
+#saver .tr .n { position: absolute; left: 0; top: 4px; color: rgba(200, 76, 54, 0.5); }
+#saver .tr .p { position: absolute; right: 200px; top: 2px; font-size: 40px; font-weight: 600; color: rgba(200, 76, 54, 0.6); font-feature-settings: 'tnum'; }
+#saver .tr .c { position: absolute; right: 0; top: 10px; width: 170px; text-align: right; font-size: 26px; font-weight: 600; color: rgba(200, 76, 54, 0.45); }
 #saver .qh { font-size: 22px; font-weight: 600; color: rgba(200, 76, 54, 0.4); margin-bottom: 8px; }
 #saver .qr { position: relative; height: 58px; font-size: 34px; font-weight: 600; }
 #saver .qr .n { position: absolute; left: 0; top: 4px; color: rgba(200, 76, 54, 0.55); }

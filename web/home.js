@@ -551,57 +551,42 @@
     updateFocus();
   }
 
-  var panelPage = 0, pageTimer = 0;
-
-  /** The cards of each page of the drawer: [{id, w (weight), draw}]. */
-  function panelPages() {
-    var br = Data.brRows(), us = Data.usRows(), p1 = [], p2 = [];
-    if (Prefs.weather()) p1.push({id: 'weather', w: 410, draw: renderWeather});
-    if (br.length) p1.push({id: 'prices', w: 390, draw: function (c) { renderPrices(c, Data.brRows()); }});
-    if (us.length) p1.push({id: 'usmarket', w: 420, draw: function (c) { renderRows(c, 'Mercado EUA', '', Data.usRows()); }});
-    if (Prefs.team()) p1.push({id: 'team', w: 500, draw: renderTeam});
-    if (Prefs.page2()) {
-      p2.push({id: 'economy', w: 400, draw: function (c) { renderRows(c, 'Juros e criptomoeda', '', Data.economyRows()); }});
-      p2.push({id: 'deadlines', w: 620, draw: renderDeadlines});
-      if (Data.trafficOn()) p2.push({id: 'traffic', w: 520, draw: renderTraffic});
-    }
-    var pages = [];
-    if (p1.length) pages.push(p1);
-    if (p2.length) pages.push(p2);
-    return pages;
+  /** The cards of the drawer, in two rows: above the shelf (compact) and below it. [{id, w (weight), draw}] */
+  function panelRows() {
+    var br = Data.brRows(), us = Data.usRows(), top = [], bottom = [], more = Prefs.page2();
+    if (Prefs.weather()) top.push({id: 'weather', w: 400, draw: renderWeather});
+    if (more && Data.trafficOn()) top.push({id: 'traffic', w: 380, draw: renderTraffic});
+    if (more) top.push({id: 'economy', w: 400, draw: function (c) { renderRows(c, 'Juros e criptomoeda', '', Data.economyRows()); }});
+    if (us.length) top.push({id: 'usmarket', w: 400, draw: function (c) { renderRows(c, 'Mercado EUA', '', Data.usRows()); }});
+    if (br.length) bottom.push({id: 'prices', w: 390, draw: function (c) { renderPrices(c, Data.brRows()); }});
+    if (more) bottom.push({id: 'deadlines', w: 620, draw: renderDeadlines});
+    if (Prefs.team()) bottom.push({id: 'team', w: 500, draw: renderTeam});
+    return [top, bottom];
   }
 
   function renderPanels() {
     var d = $('drawer');
     var old = d.querySelectorAll('.panel, .dots');
     for (var o = 0; o < old.length; o++) d.removeChild(old[o]);
-    var pages = panelPages();
-    if (!pages.length) return;
-    panelPage = panelPage % pages.length;
-    var list = pages[panelPage], gap = 16, total = 0, k;
-    for (k = 0; k < list.length; k++) total += list[k].w;
-    var space = 1760 - gap * (list.length - 1), x = 80;
-    for (k = 0; k < list.length; k++) {
-      var width = Math.round(list[k].w / total * space);
-      var card = el('div', 'panel glass', d);
-      card.id = list[k].id;
-      card.style.left = x + 'px';
-      card.style.width = width + 'px';
-      list[k].draw(card);
-      x += width + gap;
-    }
-    if (pages.length > 1) {
-      var dots = el('div', 'dots', d);
-      for (var i = 0; i < pages.length; i++) el('span', i === panelPage ? 'on' : '', dots);
+    var rows = panelRows();
+    for (var r = 0; r < rows.length; r++) {
+      var list = rows[r], gap = 16, total = 0, k;
+      for (k = 0; k < list.length; k++) total += list[k].w;
+      var space = 1760 - gap * (list.length - 1), x = 80;
+      for (k = 0; k < list.length; k++) {
+        var width = Math.round(list[k].w / total * space);
+        var card = el('div', r === 0 ? 'panel glass small' : 'panel glass', d);
+        card.id = list[k].id;
+        card.style.left = x + 'px';
+        card.style.width = width + 'px';
+        list[k].draw(card);
+        x += width + gap;
+      }
     }
   }
 
-  function nextPage(step) {
-    var n = panelPages().length;
-    if (n < 2) return;
-    panelPage = (panelPage + (step || 1) + n) % n;
-    renderPanels();
-  }
+  /** Where line j of a card starts: closer together in the compact cards. */
+  function lineTop(card, j) { return hasClass(card, 'small') ? 66 + 37 * j : 80 + 50 * j; }
 
   function renderWeather(card) {
     el('div', 'head', card, Data.city || tr('Weather'));
@@ -637,7 +622,7 @@
     el('div', 'side', card, stale ? trf('quotes|{ago}', {ago: stale}) : Data.pageTitle);
     for (var j = 0; j < coins.length; j++) {
       var i = coins[j], row = el('div', 'coin', card);
-      row.style.top = (80 + 50 * j) + 'px';
+      row.style.top = lineTop(card, j) + 'px';
       el('span', 'n', row, Data.coinName(i));
       el('span', 'p', row, Data.money(Data.prices[i], i));
       var ch = Data.changes[i];
@@ -651,7 +636,7 @@
     if (side) el('div', 'side', card, side);
     for (var j = 0; j < rows.length; j++) {
       var row = el('div', 'coin', card);
-      row.style.top = (80 + 50 * j) + 'px';
+      row.style.top = lineTop(card, j) + 'px';
       el('span', 'n', row, rows[j].name);
       var p = el('span', 'p', row, rows[j].text);
       var ch = rows[j].change;
@@ -712,7 +697,7 @@
     var list = Data.deadlines(4);
     for (var j = 0; j < list.length; j++) {
       var x = list[j], row = el('div', 'coin due', card), d = new Date(x.at);
-      row.style.top = (80 + 50 * j) + 'px';
+      row.style.top = lineTop(card, j) + 'px';
       var n = el('span', 'n', row, x.name);
       el('span', 'm', n, ' ' + x.comp);
       el('span', 'p', row, WEEK[d.getDay()] + ' ' + pad(d.getDate()) + '/' + pad(d.getMonth() + 1));
@@ -724,16 +709,17 @@
   function renderTraffic(card) {
     var t = Data.traffic;
     el('div', 'head', card, 'Trânsito');
-    if (!t) { el('div', 'cond', card, 'Carregando a rota…').style.top = '96px'; return; }
-    el('div', 'side', card, t.out ? 'Casa → Trabalho' : 'Trabalho → Casa');
+    var morning = new Date().getHours() < 14, r = t && (morning ? t.ida || t.volta : t.volta || t.ida);
+    if (!r) { el('div', 'cond', card, 'Carregando a rota…').style.top = '96px'; return; }
+    el('div', 'side', card, r === t.ida ? 'Casa → Trabalho' : 'Trabalho → Casa');
     var big = el('div', 'bigtime', card);
-    el('span', '', big, String(t.minutes));
+    el('span', '', big, String(r.minutes));
     el('small', '', big, ' min');
-    var free = Math.max(1, t.minutes - t.delay), ratio = t.delay / free;
+    var free = Math.max(1, r.minutes - r.delay), ratio = r.delay / free;
     var level = ratio < 0.1 ? 'Livre' : ratio < 0.25 ? 'Moderado' : 'Pesado';
     el('div', 'tstate ' + (ratio < 0.1 ? 'up' : ratio < 0.25 ? 'warn' : 'down'), card, level);
-    el('div', 'tline', card, t.delay > 0 ? '+' + t.delay + ' min por causa do trânsito' : 'Sem atraso de trânsito');
-    el('div', 'tline', card, String(t.km.toFixed(1)).replace('.', ',') + ' km').style.top = '248px';
+    el('div', 'tline', card, r.delay > 0 ? '+' + r.delay + ' min por causa do trânsito' : 'Sem atraso de trânsito');
+    el('div', 'tline', card, String(r.km.toFixed(1)).replace('.', ',') + ' km').style.top = '248px';
   }
 
   function openDrawer() {
@@ -1187,6 +1173,13 @@
       el('div', 'cond', t, (Data.city ? Data.city + ' · ' : '') + Data.condition(w.code, w.isDay));
       el('div', 'mm', wx, '↑ ' + Data.degrees(w.max) + '  ↓ ' + Data.degrees(w.min));
     }
+    var tr = Data.traffic;
+    if (Data.trafficOn() && tr && tr.ida) {
+      var line = el('div', 'tr', info);
+      el('span', 'n', line, 'Casa → Trabalho');
+      el('span', 'p', line, tr.ida.minutes + ' min');
+      el('span', 'c', line, tr.ida.delay > 0 ? '+' + tr.ida.delay + ' min' : 'livre');
+    }
     var coins = Data.activeCoins();
     if (coins.length) {
       var q = el('div', 'qt', info);
@@ -1230,8 +1223,6 @@
     else if (k === TV.keys.down) move(0, 1);
     else if (k === TV.keys.ok) activate();
     else if (k === TV.keys.back || k === 27 || k === 8) back();
-    else if (k === 49 || k === 34) nextPage(1);
-    else if (k === 50 || k === 33) nextPage(-1);
     else return;
     e.preventDefault();
   });
@@ -1289,8 +1280,6 @@
     renderSaverInfo();
     checkNight();
   });
-
-  pageTimer = setInterval(function () { if (st.zone === Z.DRAWER) nextPage(1); }, 18000);
 
   Data.onRotate(function () {
     renderQuotes();

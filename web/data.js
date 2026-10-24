@@ -435,7 +435,7 @@ var Data = (function () {
   // MARK: - Trânsito (TomTom: a free key; the addresses come from config.properties, never from the public release)
 
   var TRAFFIC_KEY = (CONFIG.trafficKey || '').trim();
-  var traffic = stored('traffic'), fetchingTraffic = false;
+  var traffic = stored('traffic2'), fetchingTraffic = false;
   function trafficOn() { return !!(TRAFFIC_KEY && CONFIG.home && CONFIG.work); }
 
   function geocode(address, done) {
@@ -451,26 +451,33 @@ var Data = (function () {
     });
   }
 
+  /** Both ways, home → work (ida) and work → home (volta): {ida: {minutes, delay, km}, volta: {...}, at}. */
   function refreshTraffic() {
     var now = Date.now();
     if (!trafficOn() || !Prefs.page2() || fetchingTraffic || (traffic && now - traffic.at < 5 * 60000 && now >= traffic.at)) return;
     fetchingTraffic = true;
-    var out = new Date().getHours() < 14;   // morning: to work; afternoon on: back home
-    var from = out ? CONFIG.home : CONFIG.work, to = out ? CONFIG.work : CONFIG.home;
-    geocode(from, function (a) {
+    geocode(CONFIG.home, function (a) {
       if (!a) { fetchingTraffic = false; return; }
-      geocode(to, function (b) {
+      geocode(CONFIG.work, function (b) {
         if (!b) { fetchingTraffic = false; return; }
-        get('https://api.tomtom.com/routing/1/calculateRoute/' + a + ':' + b + '/json?key=' + TRAFFIC_KEY + '&traffic=true&departAt=now', {}, function (err, o) {
-          fetchingTraffic = false;
-          try {
-            var m = o.routes[0].summary;
-            traffic = {out: out, minutes: Math.round(m.travelTimeInSeconds / 60), delay: Math.round((m.trafficDelayInSeconds || 0) / 60),
-              km: m.lengthInMeters / 1000, at: Date.now()};
-            store('traffic', traffic);
+        var res = {ida: null, volta: null, at: 0}, pending = 2;
+        function route(from, to, key) {
+          get('https://api.tomtom.com/routing/1/calculateRoute/' + from + ':' + to + '/json?key=' + TRAFFIC_KEY + '&traffic=true&departAt=now', {}, function (err, o) {
+            try {
+              var m = o.routes[0].summary;
+              res[key] = {minutes: Math.round(m.travelTimeInSeconds / 60), delay: Math.round((m.trafficDelayInSeconds || 0) / 60), km: m.lengthInMeters / 1000};
+            } catch (e) {}
+            if (--pending) return;
+            fetchingTraffic = false;
+            if (!res.ida && !res.volta) return;
+            res.at = Date.now();
+            traffic = res;
+            store('traffic2', res);
             changed();
-          } catch (e) {}
-        });
+          });
+        }
+        route(a, b, 'ida');
+        route(b, a, 'volta');
       });
     });
   }
