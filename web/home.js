@@ -1004,7 +1004,7 @@
     try { localStorage.setItem('fmtv.night', night ? 'true' : 'false'); } catch (e) {}   // for index.html, next start
   }
 
-  var saverOn = false, idleAt = Date.now(), saverIndex = 0, saverTimer = 0, SAVER_AFTER = 5 * 60000;
+  var saverOn = false, idleAt = Date.now(), saverIndex = 0, saverTimer = 0, SAVER_AFTER = 1 * 60000;
 
   /** The screensaver's photos: picks with an app on the TV. */
   function saverPhotos() {
