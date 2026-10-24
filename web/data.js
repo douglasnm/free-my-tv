@@ -54,7 +54,7 @@ var Prefs = (function () {
     shelfConfig: function () { return pick('shelfConfig', ''); },
     set: function (name, value) { v[name] = value; save(); this.version++; },
     setCoin: function (i, on) {
-      var c = (pick('coins', null) || [true, true, true, true]).slice();
+      var c = (pick('coins', null) || [true, true, true, true, true]).slice();
       c[i] = on;
       this.set('coins', c);
     }
@@ -141,72 +141,102 @@ var Data = (function () {
 
   // MARK: - Prices
 
-  var COINS = ['BTC', 'ETH', 'SOL', 'USDT'];
-  var CURRENCY = Place.currency;
-  var QUOTE = CURRENCY === 'USD' ? 'USDT' : CURRENCY;
-  /** Binance refuses the whole request when it has no pairs in the currency (INR...): the prices go in dollars then. */
-  function inDollars() {
-    store('dollarsFor', CURRENCY);
-    CURRENCY = 'USD';
-    QUOTE = 'USDT';
-  }
-  if (stored('dollarsFor') === CURRENCY && CURRENCY !== 'USD') {
-    CURRENCY = 'USD';
-    QUOTE = 'USDT';
-  }
-  var prices = [NaN, NaN, NaN, NaN], changes = [NaN, NaN, NaN, NaN], pricesAt = 0, fetchingPrices = false;
+  // B3 em vez de criptomoedas: Ibovespa (HG Brasil), dólar (AwesomeAPI) e as 60 ações mais negociadas (brapi, sem
+  // chave). Dessa lista saem as maiores altas, as maiores baixas e as mais negociadas, que se alternam na tela.
+  var CURRENCY = 'BRL';
+  var ROWS = 5;   // Ibovespa, dólar e 3 ações da página atual
+  var NAMES = ['Ibovespa', 'Dólar', '', '', ''], LABELS = ['IBOV', 'US$', '', '', ''];
+  var prices = [NaN, NaN, NaN, NaN, NaN], changes = [NaN, NaN, NaN, NaN, NaN];
+  var market = {ibov: null, usd: null, stocks: [], at: 0}, pricesAt = 0, fetchingPrices = false;
+  var pages = [], page = 0, pageTitle = '', rotateListeners = [];
 
-  /** Indexes in COINS of the coins that are on (the dollar only in Brazilian reais, where Binance lists it). */
+  function buildPages() {
+    var s = market.stocks.filter(function (x) { return x.p >= 1; });
+    var groups = [
+      ['Maiores altas', s.filter(function (x) { return x.c > 0; }).sort(function (a, b) { return b.c - a.c; })],
+      ['Maiores baixas', s.filter(function (x) { return x.c < 0; }).sort(function (a, b) { return a.c - b.c; })],
+      ['Mais negociadas', s.slice().sort(function (a, b) { return b.v - a.v; })]
+    ];
+    pages = [];
+    for (var start = 0; start < 6; start += 3) {
+      for (var g = 0; g < groups.length; g++) {
+        var part = groups[g][1].slice(start, start + 3);
+        if (part.length) pages.push({title: groups[g][0], items: part});
+      }
+    }
+  }
+
+  function showPage() {
+    var pg = pages.length ? pages[page % pages.length] : null;
+    pageTitle = pg ? pg.title : '';
+    for (var k = 0; k < 3; k++) {
+      var x = pg && pg.items[k], i = 2 + k;
+      NAMES[i] = LABELS[i] = x ? x.s : '';
+      prices[i] = x ? x.p : NaN;
+      changes[i] = x ? x.c : NaN;
+    }
+  }
+
+  function setFixed() {
+    prices[0] = market.ibov ? market.ibov[0] : NaN; changes[0] = market.ibov ? market.ibov[1] : NaN;
+    prices[1] = market.usd ? market.usd[0] : NaN; changes[1] = market.usd ? market.usd[1] : NaN;
+  }
+
+  /** Rows on screen: the two fixed ones and the stocks of the current page. */
   function activeCoins() {
     var out = [];
     if (!Prefs.quotes()) return out;
-    for (var i = 0; i < COINS.length; i++) if (Prefs.coin(i) && (i < 3 || CURRENCY === 'BRL')) out.push(i);
+    for (var i = 0; i < ROWS; i++) if (i < 2 || NAMES[i]) out.push(i);
     return out;
   }
 
-  function parsePrices(list) {
-    var found = 0;
-    for (var i = 0; list && i < list.length; i++) {
-      for (var k = 0; k < COINS.length; k++) {
-        if (list[i].symbol !== COINS[k] + QUOTE) continue;
-        found++;
-        var last = parseFloat(list[i].lastPrice), open = parseFloat(list[i].openPrice);
-        prices[k] = last;
-        changes[k] = open > 0 ? (last - open) / open * 100 : NaN;
-      }
-    }
-    return found;
-  }
-
   (function () {
-    var p = stored('prices');
-    if (p && p.quote === QUOTE && parsePrices(p.body)) pricesAt = p.at;
+    var m = stored('quotesB3v2');
+    if (!m || !m.stocks) return;
+    market = m; pricesAt = m.at;
+    setFixed(); buildPages(); showPage();
   })();
 
+  setInterval(function () {
+    if (pages.length < 2) return;
+    page++;
+    showPage();
+    for (var i = 0; i < rotateListeners.length; i++) rotateListeners[i]();
+  }, 8000);
+
   function refreshPrices() {
-    var coins = activeCoins(), now = Date.now();
-    if (!coins.length || fetchingPrices || (now - pricesAt < 5 * 60000 && now >= pricesAt)) return;
+    var now = Date.now();
+    if (!activeCoins().length || fetchingPrices || (now - pricesAt < 5 * 60000 && now >= pricesAt)) return;
     fetchingPrices = true;
-    var symbols = coins.map(function (i) { return '%22' + COINS[i] + QUOTE + '%22'; }).join(',');
-    var path = '/api/v3/ticker/24hr?type=MINI&symbols=%5B' + symbols + '%5D';
-    // Binance.com refuses the US (HTTP 451); Binance.US answers the same call in dollars.
-    var hosts = ['https://api.binance.com', 'https://api.binance.us'];
-    (function next(h, refused) {
-      get(hosts[h] + path, {}, function (err, body) {
-        // A pair Binance doesn't list (HTTP 400): the prices go in dollars. Binance.US has only dollar pairs: its 400
-        // counts only where Binance.com refuses the US (HTTP 451), not after a timeout or a 5xx there.
-        if (err && err.message === 'HTTP 400' && QUOTE !== 'USDT' && (h === 0 || refused)) { fetchingPrices = false; inDollars(); refreshPrices(); return; }
-        if (err || !parsePrices(body)) {
-          if (h + 1 < hosts.length && !(err && err.message === 'HTTP 400')) next(h + 1, err && err.message === 'HTTP 451');
-          else fetchingPrices = false;
-          return;
+    var pending = 3, got = false;
+    function done() {
+      if (--pending) return;
+      fetchingPrices = false;
+      if (!got) return;
+      pricesAt = market.at = Date.now();
+      setFixed(); buildPages(); showPage();
+      store('quotesB3v2', market);
+      changed();
+    }
+    get('https://api.hgbrasil.com/finance?format=json-cors', {}, function (err, o) {
+      try { var b = o.results.stocks.IBOVESPA; if (!isNaN(b.points)) { market.ibov = [b.points, b.variation]; got = true; } } catch (e) {}
+      done();
+    });
+    get('https://economia.awesomeapi.com.br/json/last/USD-BRL', {}, function (err, o) {
+      try { var v = parseFloat(o.USDBRL.bid); if (!isNaN(v)) { market.usd = [v, parseFloat(o.USDBRL.pctChange)]; got = true; } } catch (e) {}
+      done();
+    });
+    get('https://brapi.dev/api/quote/list?sortBy=volume&sortOrder=desc&limit=60&type=stock', {}, function (err, o) {
+      try {
+        var list = [];
+        for (var k = 0; k < o.stocks.length; k++) {
+          var r = o.stocks[k];
+          if (typeof r.close === 'number' && typeof r.change === 'number') list.push({s: r.stock, p: r.close, c: r.change, v: r.volume || 0});
         }
-        fetchingPrices = false;
-        pricesAt = Date.now();
-        store('prices', {quote: QUOTE, body: body, at: pricesAt});
-        changed();
-      });
-    })(0);
+        if (list.length) { market.stocks = list; got = true; }
+      } catch (e) {}
+      done();
+    });
   }
 
   // MARK: - Picks (TMDB)
@@ -512,7 +542,8 @@ var Data = (function () {
   var SYMBOLS = {USD: '$', BRL: 'R$ ', EUR: '€', GBP: '£', JPY: '¥'};
 
   return {
-    COINS: COINS,
+    get pageTitle() { return pageTitle; },
+    onRotate: function (fn) { rotateListeners.push(fn); },
     city: Place.city,
     currency: CURRENCY,
     onChange: function (fn) { listeners.push(fn); },
@@ -551,10 +582,10 @@ var Data = (function () {
       if (v >= 100) return fmt(v, 0);
       return fmt(v, 2);
     },
-    money: function (v) {
-      var s = SYMBOLS[CURRENCY] || CURRENCY + ' ';
-      if (isNaN(v)) return s + '—';
-      return s + (v >= 1000 ? fmt(v, 0) : fmt(v, 2));
+    money: function (v, i) {
+      if (isNaN(v)) return i === 0 ? '—' : 'R$ —';
+      if (i === 0) return fmt(v, 0) + ' pts';
+      return 'R$ ' + fmt(v, 2);
     },
     change: function (v) { return isNaN(v) ? '' : (v >= 0 ? '+' : '−') + fmt(Math.abs(v), 1) + '%'; },
     degrees: function (v) {
@@ -597,6 +628,7 @@ var Data = (function () {
       if (code >= 95) return 'thunderstorm';
       return 'rainy';
     },
-    coinName: function (i) { return i === 3 ? tr('Dollar') : ['Bitcoin', 'Ethereum', 'Solana'][i]; }
+    coinName: function (i) { return NAMES[i]; },
+    coinLabel: function (i) { return LABELS[i]; }
   };
 })();

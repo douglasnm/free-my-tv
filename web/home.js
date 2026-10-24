@@ -380,8 +380,7 @@
     q.innerHTML = '';
     for (var i = 0; i < coins.length; i++) {
       var item = el('span', 'q', q);
-      coin(coins[i], item);
-      el('span', '', item, Data.compact(Data.prices[coins[i]]));
+      el('span', '', item, Data.coinLabel(coins[i]) + ' ' + Data.compact(Data.prices[coins[i]]));
     }
   }
 
@@ -603,15 +602,15 @@
   }
 
   function renderPrices(card, coins) {
-    el('div', 'head', card, tr('Crypto'));
+    el('div', 'head', card, 'Bolsa');
     var stale = Data.staleness(Data.pricesAt, 5 * 60000);
-    el('div', 'side', card, stale ? trf('quotes|{ago}', {ago: stale}) : tr('24h change'));
+    el('div', 'side', card, stale ? trf('quotes|{ago}', {ago: stale}) : Data.pageTitle);
     for (var j = 0; j < coins.length; j++) {
       var i = coins[j], row = el('div', 'coin', card);
-      row.style.top = (86 + 52 * j) + 'px';
+      row.style.top = (76 + 44 * j) + 'px';
       coin(i, row);
       el('span', 'n', row, Data.coinName(i));
-      el('span', 'p', row, Data.money(Data.prices[i]));
+      el('span', 'p', row, Data.money(Data.prices[i], i));
       var ch = Data.changes[i];
       if (!isNaN(ch)) el('span', 'c ' + (ch >= 0 ? 'up' : 'down'), row, Data.change(ch));
     }
@@ -684,14 +683,6 @@
       {label: tr('Quotes widget'), toggle: Prefs.quotes(),
         step: function () { Prefs.set('quotes', !Prefs.quotes()); Data.settingsChanged(); }}
     ];
-    var names = ['Bitcoin', 'Ethereum', 'Solana', tr('Dollar')];
-    var count = Data.currency === 'BRL' ? 4 : 3;
-    for (var i = 0; i < count; i++) {
-      (function (i) {
-        rows.push({label: names[i], toggle: Prefs.quotes() && Prefs.coin(i), dim: !Prefs.quotes(),
-          step: function () { if (Prefs.quotes()) { Prefs.setCoin(i, !Prefs.coin(i)); Data.settingsChanged(); } }});
-      })(i);
-    }
     rows.push({label: tr('Shelf'), value: '›', step: function (d) { if (d >= 0) openShelfEdit(); }});
     rows.push({label: tr('TV Settings'), value: '›', step: function (d) { if (d >= 0) tvSettings(); }});
     return rows;
@@ -1031,6 +1022,8 @@
     el('div', 'time', clock);
     el('div', 'date', clock);
     el('div', 'title', clock);
+    el('div', 'info', s);
+    renderSaverInfo();
     var front = a;
     function next() {
       if (!saverOn) return;
@@ -1052,6 +1045,34 @@
     }
     setClass(s, 'on', true);
     next();
+  }
+
+  /** The screensaver's right side: the weather and the market, as on the home screen. */
+  function renderSaverInfo() {
+    var info = $('saver').querySelector('.info');
+    if (!saverOn || !info) return;
+    info.innerHTML = '';
+    var w = Data.weather;
+    if (Prefs.weather() && w) {
+      var wx = el('div', 'wx', info);
+      sym(Data.symbol(w.code, w.isDay), wx, 64);
+      var t = el('div', 'wt', wx);
+      el('div', 'deg', t, Data.degrees(w.temp));
+      el('div', 'cond', t, (Data.city ? Data.city + ' · ' : '') + Data.condition(w.code, w.isDay));
+      el('div', 'mm', wx, '↑ ' + Data.degrees(w.max) + '  ↓ ' + Data.degrees(w.min));
+    }
+    var coins = Data.activeCoins();
+    if (coins.length) {
+      var q = el('div', 'qt', info);
+      el('div', 'qh', q, Data.pageTitle ? 'Bolsa · ' + Data.pageTitle : 'Bolsa');
+      for (var j = 0; j < coins.length; j++) {
+        var i = coins[j], row = el('div', 'qr', q);
+        el('span', 'n', row, Data.coinName(i));
+        el('span', 'p', row, Data.money(Data.prices[i], i));
+        var ch = Data.changes[i];
+        el('span', 'c ' + (isNaN(ch) ? '' : ch >= 0 ? 'up' : 'down'), row, isNaN(ch) ? '' : Data.change(ch));
+      }
+    }
   }
 
   function tickSaverClock(clock) {
@@ -1137,7 +1158,15 @@
     renderQuotes();
     renderCards();
     renderPanels();
+    renderSaverInfo();
     checkNight();
+  });
+
+  Data.onRotate(function () {
+    renderQuotes();
+    var card = $('prices');
+    if (card) { card.innerHTML = ''; renderPrices(card, Data.activeCoins()); }
+    renderSaverInfo();
   });
 
   function reopened() {
