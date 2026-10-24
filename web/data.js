@@ -45,8 +45,10 @@ var Prefs = (function () {
     version: 0,
     language: function () { return pick('language', CONFIG.language || 'auto'); },
     temperature: function () { return pick('temperature', CONFIG.temperature || 'auto'); },
-    theme: function () { return pick('theme', 'auto'); },
+    theme: function () { return pick('theme', 'dark'); },
     weather: function () { return pick('weather', true); },
+    us: function () { return pick('us', true); },
+    team: function () { return pick('team', true); },
     quotes: function () { return pick('quotes', CONFIG.showCrypto !== false); },
     coin: function (i) { var c = pick('coins', null); return c ? c[i] !== false : true; },
     shelf: function () { return pick('shelf', null); },
@@ -220,6 +222,12 @@ var Data = (function () {
     }
     get('https://api.hgbrasil.com/finance?format=json-cors', {}, function (err, o) {
       try { var b = o.results.stocks.IBOVESPA; if (!isNaN(b.points)) { market.ibov = [b.points, b.variation]; got = true; } } catch (e) {}
+      try {
+        var st = o.results.stocks, cu = o.results.currencies;
+        market.nasdaq = [st.NASDAQ.points, st.NASDAQ.variation];
+        market.dow = [st.DOWJONES.points, st.DOWJONES.variation];
+        market.eur = [cu.EUR.buy, cu.EUR.variation];
+      } catch (e) {}
       done();
     });
     get('https://economia.awesomeapi.com.br/json/last/USD-BRL', {}, function (err, o) {
@@ -237,6 +245,82 @@ var Data = (function () {
       } catch (e) {}
       done();
     });
+  }
+
+  /** Rows of the Brazilian card: Ibovespa and the 3 stocks of the page (the dollar goes to the US card). */
+  function brRows() {
+    var out = [];
+    if (!Prefs.quotes()) return out;
+    var all = [0, 2, 3, 4];
+    for (var k = 0; k < all.length; k++) if (all[k] === 0 || NAMES[all[k]]) out.push(all[k]);
+    return out;
+  }
+
+  /** The US card: Nasdaq, Dow Jones, and the dollar and euro in reais. */
+  function usRows() {
+    var m = market;
+    function row(name, v, digits, pct, reais) {
+      return {name: name, text: v ? (reais ? 'R$ ' : '') + fmt(v[0], digits) : '—', change: v ? v[1] : NaN};
+    }
+    if (!Prefs.us()) return [];
+    return [row('Nasdaq', m.nasdaq, 0), row('Dow Jones', m.dow, 0), row('Dólar', m.usd, 2, 0, true), row('Euro', m.eur, 2, 0, true)];
+  }
+
+  // MARK: - Palmeiras (ESPN: results and next games, in every competition)
+
+  var PAL = '2029';
+  var team = {live: null, next: [], last: [], at: 0}, fetchingTeam = false;
+  (function () { var t = stored('palmeiras'); if (t && t.next) team = t; })();
+
+  var LEAGUES = {'Brazilian Serie A': 'Brasileirão', 'CONMEBOL Libertadores': 'Libertadores', 'Brazilian Campeonato Paulista': 'Paulistão',
+    'CONMEBOL Sudamericana': 'Sul-Americana', 'FIFA Club World Cup': 'Mundial de Clubes'};
+
+  function parseEvent(e) {
+    var c = e.competitions && e.competitions[0];
+    if (!c) return null;
+    var me = null, opp = null;
+    for (var i = 0; i < c.competitors.length; i++) {
+      if (String(c.competitors[i].team.id) === PAL) me = c.competitors[i]; else opp = c.competitors[i];
+    }
+    if (!me || !opp) return null;
+    function score(x) { var v = x.score; if (v && typeof v === 'object') v = v.displayValue; return v === undefined || v === null || v === '' ? '' : String(v); }
+    var league = e.league && e.league.name ? e.league.name : '';
+    return {id: e.id, at: new Date(e.date).getTime(), state: c.status.type.state, home: me.homeAway === 'home',
+      opp: opp.team.shortDisplayName || opp.team.displayName || opp.team.abbreviation, mine: score(me), theirs: score(opp),
+      clock: c.status.displayClock || '', league: LEAGUES[league] || league.replace(/^Brazilian /, '')};
+  }
+
+  function refreshTeam() {
+    var now = Date.now(), every = team.live ? 2 * 60000 : 15 * 60000;
+    if (!Prefs.team() || fetchingTeam || (now - team.at < every && now >= team.at)) return;
+    fetchingTeam = true;
+    var base = 'https://site.web.api.espn.com/apis/site/v2/sports/soccer/all/teams/' + PAL + '/schedule';
+    var pending = 2, events = {};
+    function done() {
+      if (--pending) return;
+      fetchingTeam = false;
+      var list = [];
+      for (var id in events) if (events.hasOwnProperty(id)) list.push(events[id]);
+      if (!list.length) return;
+      list.sort(function (a, b) { return a.at - b.at; });
+      var t = {live: null, next: [], last: [], at: Date.now()};
+      for (var i = 0; i < list.length; i++) {
+        if (list[i].state === 'in') t.live = list[i];
+        else if (list[i].state === 'pre') t.next.push(list[i]);
+        else if (list[i].state === 'post') t.last.push(list[i]);
+      }
+      t.last = t.last.slice(-2).reverse();
+      t.next = t.next.slice(0, 3);
+      team = t;
+      store('palmeiras', t);
+      changed();
+    }
+    function take(err, o) {
+      try { for (var i = 0; i < o.events.length; i++) { var p = parseEvent(o.events[i]); if (p) events[p.id] = p; } } catch (e) {}
+      done();
+    }
+    get(base, {}, take);
+    get(base + '?fixture=true', {}, take);
   }
 
   // MARK: - Picks (TMDB)
@@ -549,7 +633,7 @@ var Data = (function () {
     onChange: function (fn) { listeners.push(fn); },
     setApps: function (apps) { installed = apps; },
     appFor: appFor,
-    refresh: function () { refreshWeather(); refreshPrices(); refreshRecs(); },
+    refresh: function () { refreshWeather(); refreshPrices(); refreshTeam(); refreshRecs(); },
     settingsChanged: function () { pricesAt = 0; refreshPrices(); changed(); },
     get weather() { return weather; },
     get weatherAt() { return weatherAt; },
@@ -557,6 +641,9 @@ var Data = (function () {
     changes: changes,
     get pricesAt() { return pricesAt; },
     activeCoins: activeCoins,
+    brRows: brRows,
+    usRows: usRows,
+    get team() { return team; },
     hasKey: function () { return !!KEY; },
     recsError: function () { return recsError; },
     picks: now,
@@ -584,7 +671,7 @@ var Data = (function () {
     },
     money: function (v, i) {
       if (isNaN(v)) return i === 0 ? '—' : 'R$ —';
-      if (i === 0) return fmt(v, 0) + ' pts';
+      if (i === 0) return fmt(v, 0);
       return 'R$ ' + fmt(v, 2);
     },
     change: function (v) { return isNaN(v) ? '' : (v >= 0 ? '+' : '−') + fmt(Math.abs(v), 1) + '%'; },

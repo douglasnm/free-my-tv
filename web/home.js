@@ -555,22 +555,23 @@
     var d = $('drawer');
     var old = d.querySelectorAll('.panel');
     for (var o = 0; o < old.length; o++) d.removeChild(old[o]);
-    var wx = Prefs.weather(), coins = Data.activeCoins(), qt = coins.length > 0;
-    var split = 80 + 1760 * 0.585;
-    if (wx) {
-      var w = el('div', 'panel glass', d);
-      w.id = 'weather';
-      w.style.left = '80px';
-      w.style.width = ((qt ? split - 16 : 1840) - 80) + 'px';
-      renderWeather(w);
-    }
-    if (qt) {
-      var q = el('div', 'panel glass', d);
-      q.id = 'prices';
-      var left = wx ? split + 16 : 80;
-      q.style.left = left + 'px';
-      q.style.width = (1840 - left) + 'px';
-      renderPrices(q, coins);
+    var br = Data.brRows(), us = Data.usRows();
+    var list = [];
+    if (Prefs.weather()) list.push({id: 'weather', w: 410, draw: renderWeather});
+    if (br.length) list.push({id: 'prices', w: 390, draw: function (c) { renderPrices(c, Data.brRows()); }});
+    if (us.length) list.push({id: 'usmarket', w: 420, draw: renderUS});
+    if (Prefs.team()) list.push({id: 'team', w: 500, draw: renderTeam});
+    var gap = 16, total = 0, k;
+    for (k = 0; k < list.length; k++) total += list[k].w;
+    var space = 1760 - gap * (list.length - 1), x = 80;
+    for (k = 0; k < list.length; k++) {
+      var width = Math.round(list[k].w / total * space);
+      var card = el('div', 'panel glass', d);
+      card.id = list[k].id;
+      card.style.left = x + 'px';
+      card.style.width = width + 'px';
+      list[k].draw(card);
+      x += width + gap;
     }
   }
 
@@ -586,9 +587,10 @@
     el('span', 'temp', now, Data.degrees(w.temp));
     el('div', 'cond', card, Data.condition(w.code, w.isDay));
     el('div', 'range', card, trf('H:{max}', {max: Data.degrees(w.max)}) + '   ' + trf('L:{min}', {min: Data.degrees(w.min)}));
-    el('div', 'split', card);
+    var narrow = parseFloat(card.style.width) < 700;
+    if (!narrow) el('div', 'split', card);
     var hours = el('div', 'hours', card), width = parseFloat(card.style.width) - 30 - 422, hw = width / 6;
-    for (var i = 0; i < w.hours.length && i < 6; i++) {
+    for (var i = 0; !narrow && i < w.hours.length && i < 6; i++) {
       var h = el('div', 'hour', hours), x = w.hours[i];
       h.style.left = (hw * i) + 'px';
       h.style.width = hw + 'px';
@@ -596,23 +598,81 @@
       sym(Data.symbol(x.code, x.day), h);
       el('div', 'd', h, Data.degrees(x.temp));
     }
-    var sun = el('div', 'sun', card);
-    if (w.sunrise) { var a = el('span', '', sun); sym('sunrise', a); a.appendChild(document.createTextNode(trf('Sunrise {time}', {time: Data.time(w.sunrise)}))); }
-    if (w.sunset) { var b = el('span', '', sun); sym('sunset', b); b.appendChild(document.createTextNode(trf('Sunset {time}', {time: Data.time(w.sunset)}))); }
+    var sun = el('div', narrow ? 'sun narrow' : 'sun', card);
+    if (w.sunrise) { var a = el('span', '', sun); sym('sunrise', a); a.appendChild(document.createTextNode(narrow ? Data.time(w.sunrise) : trf('Sunrise {time}', {time: Data.time(w.sunrise)}))); }
+    if (w.sunset) { var b = el('span', '', sun); sym('sunset', b); b.appendChild(document.createTextNode(narrow ? Data.time(w.sunset) : trf('Sunset {time}', {time: Data.time(w.sunset)}))); }
   }
 
   function renderPrices(card, coins) {
-    el('div', 'head', card, 'Bolsa');
+    el('div', 'head', card, 'Bolsa Brasil');
     var stale = Data.staleness(Data.pricesAt, 5 * 60000);
     el('div', 'side', card, stale ? trf('quotes|{ago}', {ago: stale}) : Data.pageTitle);
     for (var j = 0; j < coins.length; j++) {
       var i = coins[j], row = el('div', 'coin', card);
-      row.style.top = (76 + 44 * j) + 'px';
-      coin(i, row);
+      row.style.top = (80 + 50 * j) + 'px';
       el('span', 'n', row, Data.coinName(i));
       el('span', 'p', row, Data.money(Data.prices[i], i));
       var ch = Data.changes[i];
       if (!isNaN(ch)) el('span', 'c ' + (ch >= 0 ? 'up' : 'down'), row, Data.change(ch));
+    }
+  }
+
+  function renderUS(card) {
+    var rows = Data.usRows();
+    el('div', 'head', card, 'Mercado EUA');
+    for (var j = 0; j < rows.length; j++) {
+      var row = el('div', 'coin', card);
+      row.style.top = (80 + 50 * j) + 'px';
+      el('span', 'n', row, rows[j].name);
+      el('span', 'p', row, rows[j].text);
+      var ch = rows[j].change;
+      if (!isNaN(ch)) el('span', 'c ' + (ch >= 0 ? 'up' : 'down'), row, Data.change(ch));
+    }
+  }
+
+  var WEEK = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function when(at) {
+    var d = new Date(at);
+    return WEEK[d.getDay()] + ' ' + pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + ' · ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+  function day(at) { var d = new Date(at); return pad(d.getDate()) + '/' + pad(d.getMonth() + 1); }
+
+  function renderTeam(card) {
+    var t = Data.team;
+    el('div', 'head', card, 'Palmeiras');
+    var next = t.next.slice(), nxt = t.live ? t.live : next[0];
+    el('div', 'side', card, nxt ? nxt.league : '');
+    if (!t.live && !next.length && !t.last.length) { el('div', 'cond', card, 'Sem dados dos jogos agora.').style.top = '96px'; return; }
+    var y = 74;
+    if (t.live) {
+      var lv = el('div', 'game live', card);
+      lv.style.top = y + 'px';
+      el('span', 'd', lv, 'AO VIVO');
+      el('span', 'o', lv, 'PAL ' + t.live.mine + ' × ' + t.live.theirs + ' ' + t.live.opp + (t.live.clock ? ' · ' + t.live.clock : ''));
+      y += 40;
+    }
+    var shown = t.live ? 1 : 2;
+    for (var i = 0; i < next.length && i < shown; i++) {
+      var g = el('div', 'game', card);
+      g.style.top = y + 'px';
+      el('span', 'd', g, when(next[i].at));
+      el('span', 'o', g, (next[i].home ? 'vs ' : '@ ') + next[i].opp);
+      y += 38;
+    }
+    if (t.last.length) {
+      var h = el('div', 'sub', card, 'Últimos resultados');
+      h.style.top = (y + 6) + 'px';
+      y += 40;
+      for (var j = 0; j < t.last.length && j < 2; j++) {
+        var r = t.last[j], row = el('div', 'game res', card);
+        var a = parseInt(r.mine, 10), b = parseInt(r.theirs, 10);
+        row.style.top = y + 'px';
+        el('span', 'd', row, day(r.at));
+        el('span', 'o', row, 'PAL ' + r.mine + ' × ' + r.theirs + ' ' + r.opp);
+        el('span', 'r ' + (a > b ? 'win' : a < b ? 'loss' : 'draw'), row, a > b ? 'V' : a < b ? 'D' : 'E');
+        y += 38;
+      }
     }
   }
 
@@ -681,7 +741,11 @@
       {label: tr('Weather widget'), toggle: Prefs.weather(),
         step: function () { Prefs.set('weather', !Prefs.weather()); renderPanels(); }},
       {label: tr('Quotes widget'), toggle: Prefs.quotes(),
-        step: function () { Prefs.set('quotes', !Prefs.quotes()); Data.settingsChanged(); }}
+        step: function () { Prefs.set('quotes', !Prefs.quotes()); Data.settingsChanged(); }},
+      {label: 'Mercado EUA', toggle: Prefs.us(),
+        step: function () { Prefs.set('us', !Prefs.us()); renderPanels(); }},
+      {label: 'Palmeiras', toggle: Prefs.team(),
+        step: function () { Prefs.set('team', !Prefs.team()); Data.settingsChanged(); renderPanels(); }}
     ];
     rows.push({label: tr('Shelf'), value: '›', step: function (d) { if (d >= 0) openShelfEdit(); }});
     rows.push({label: tr('TV Settings'), value: '›', step: function (d) { if (d >= 0) tvSettings(); }});
@@ -1165,7 +1229,7 @@
   Data.onRotate(function () {
     renderQuotes();
     var card = $('prices');
-    if (card) { card.innerHTML = ''; renderPrices(card, Data.activeCoins()); }
+    if (card) { card.innerHTML = ''; renderPrices(card, Data.brRows()); }
     renderSaverInfo();
   });
 
