@@ -501,35 +501,29 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 #saver .photo { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; background-size: cover; background-position: center; opacity: 0; -webkit-transition: opacity 2.4s, -webkit-transform 24s linear; transition: opacity 2.4s, transform 24s linear; }
 #saver .photo.on { opacity: 1; }
 #saver .shade { position: absolute; left: 0; right: 0; bottom: 0; height: 520px; background: -webkit-linear-gradient(top, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.55)); background: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.55)); }
-/* Night mode: it stays on while the person sleeps. Black, one dim warm tone (little blue light), no glow, no bright
-   color. Up and down are arrows, not colors. */
+/* Like the iPhone's StandBy at night: black, a huge clock on one side, the widgets on the other, no boxes, one very
+   dim red. It stays on while the person sleeps: no glow, no bright color. Up and down are arrows, not colors. */
 #saver .shade { display: none; }
-#saver .clock, #saver .info {
-  position: absolute;
-  bottom: 90px;
-  color: rgba(214, 160, 104, 0.5);
-  white-space: nowrap;
-  border-left: 1px solid rgba(214, 160, 104, 0.2);
-}
-#saver .clock { left: 80px; padding: 4px 0 6px 40px; }
-#saver .info { right: 80px; width: 600px; padding: 4px 0 6px 40px; }
-#saver .clock .time { font-size: 150px; font-weight: 200; line-height: 1; letter-spacing: 0.02em; font-feature-settings: 'tnum'; color: rgba(214, 160, 104, 0.55); }
-#saver .clock .date { margin-top: 14px; font-size: 24px; font-weight: 400; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(214, 160, 104, 0.38); }
-#saver .clock .title { margin-top: 18px; font-size: 20px; font-weight: 400; letter-spacing: 0.1em; color: rgba(214, 160, 104, 0.25); }
+#saver .clock, #saver .info { position: absolute; top: 50%; white-space: nowrap; color: rgba(200, 76, 54, 0.5); -webkit-transform: translateY(-50%); transform: translateY(-50%); }
+#saver .clock { left: 110px; width: 840px; }
+#saver .info { right: 110px; width: 760px; }
+#saver .clock .time { font-size: 290px; font-weight: 700; line-height: 1; letter-spacing: -0.03em; font-feature-settings: 'tnum'; color: rgba(200, 76, 54, 0.62); }
+#saver .clock .date { margin-top: 10px; padding-left: 14px; font-size: 34px; font-weight: 600; letter-spacing: 0.02em; color: rgba(200, 76, 54, 0.42); }
+#saver .clock .title { margin-top: 18px; padding-left: 14px; font-size: 22px; font-weight: 500; color: rgba(200, 76, 54, 0.28); }
 #saver .info:empty { display: none; }
-#saver .wx { position: relative; height: 84px; margin-bottom: 20px; padding-bottom: 22px; border-bottom: 1px solid rgba(214, 160, 104, 0.14); }
-#saver .wx .sym { position: absolute; left: 0; top: 8px; background: rgba(214, 160, 104, 0.45); }
-#saver .wx .wt { position: absolute; left: 88px; top: 0; }
-#saver .wx .deg { font-size: 60px; font-weight: 200; line-height: 64px; color: rgba(214, 160, 104, 0.55); }
-#saver .wx .cond { font-size: 18px; font-weight: 400; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(214, 160, 104, 0.35); }
-#saver .wx .mm { position: absolute; right: 0; top: 22px; font-size: 26px; font-weight: 300; letter-spacing: 0.06em; color: rgba(214, 160, 104, 0.4); }
-#saver .qh { font-size: 17px; font-weight: 500; letter-spacing: 0.24em; text-transform: uppercase; color: rgba(214, 160, 104, 0.35); margin-bottom: 10px; }
-#saver .qr { position: relative; height: 46px; font-size: 24px; font-weight: 400; letter-spacing: 0.08em; border-bottom: 1px solid rgba(214, 160, 104, 0.08); }
-#saver .qr .n { position: absolute; left: 0; top: 4px; color: rgba(214, 160, 104, 0.5); }
-#saver .qr .p { position: absolute; right: 150px; top: 5px; font-size: 23px; font-weight: 300; letter-spacing: 0.02em; font-feature-settings: 'tnum'; color: rgba(214, 160, 104, 0.45); }
-#saver .qr .c { position: absolute; right: 0; top: 5px; width: 124px; text-align: right; font-size: 20px; font-weight: 400; letter-spacing: 0.04em; font-feature-settings: 'tnum'; color: rgba(214, 160, 104, 0.45); }
-#saver .qr .up:before { content: '▲  '; font-size: 14px; }
-#saver .qr .down:before { content: '▼  '; font-size: 14px; }
+#saver .wx { position: relative; height: 210px; margin-bottom: 24px; }
+#saver .wx .sym { position: absolute; left: 0; top: 20px; width: 84px; height: 84px; background: rgba(200, 76, 54, 0.5); }
+#saver .wx .wt { position: absolute; left: 118px; top: 0; }
+#saver .wx .deg { font-size: 112px; font-weight: 600; line-height: 112px; letter-spacing: -0.02em; color: rgba(200, 76, 54, 0.62); }
+#saver .wx .cond { margin-top: 8px; font-size: 26px; font-weight: 600; color: rgba(200, 76, 54, 0.4); }
+#saver .wx .mm { position: absolute; left: 0; top: 168px; font-size: 26px; font-weight: 600; color: rgba(200, 76, 54, 0.4); }
+#saver .qh { font-size: 22px; font-weight: 600; color: rgba(200, 76, 54, 0.4); margin-bottom: 8px; }
+#saver .qr { position: relative; height: 58px; font-size: 34px; font-weight: 600; }
+#saver .qr .n { position: absolute; left: 0; top: 4px; color: rgba(200, 76, 54, 0.55); }
+#saver .qr .p { position: absolute; right: 200px; top: 5px; font-size: 32px; font-weight: 500; font-feature-settings: 'tnum'; color: rgba(200, 76, 54, 0.5); }
+#saver .qr .c { position: absolute; right: 0; top: 8px; width: 170px; text-align: right; font-size: 26px; font-weight: 600; font-feature-settings: 'tnum'; color: rgba(200, 76, 54, 0.5); }
+#saver .qr .up:before { content: '▲  '; font-size: 16px; }
+#saver .qr .down:before { content: '▼  '; font-size: 16px; }
 
 /* MARK: - Toast */
 
