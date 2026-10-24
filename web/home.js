@@ -551,17 +551,34 @@
     updateFocus();
   }
 
+  var panelPage = 0, pageTimer = 0;
+
+  /** The cards of each page of the drawer: [{id, w (weight), draw}]. */
+  function panelPages() {
+    var br = Data.brRows(), us = Data.usRows(), p1 = [], p2 = [];
+    if (Prefs.weather()) p1.push({id: 'weather', w: 410, draw: renderWeather});
+    if (br.length) p1.push({id: 'prices', w: 390, draw: function (c) { renderPrices(c, Data.brRows()); }});
+    if (us.length) p1.push({id: 'usmarket', w: 420, draw: function (c) { renderRows(c, 'Mercado EUA', '', Data.usRows()); }});
+    if (Prefs.team()) p1.push({id: 'team', w: 500, draw: renderTeam});
+    if (Prefs.page2()) {
+      p2.push({id: 'economy', w: 400, draw: function (c) { renderRows(c, 'Juros e criptomoeda', '', Data.economyRows()); }});
+      p2.push({id: 'deadlines', w: 620, draw: renderDeadlines});
+      if (Data.trafficOn()) p2.push({id: 'traffic', w: 520, draw: renderTraffic});
+    }
+    var pages = [];
+    if (p1.length) pages.push(p1);
+    if (p2.length) pages.push(p2);
+    return pages;
+  }
+
   function renderPanels() {
     var d = $('drawer');
-    var old = d.querySelectorAll('.panel');
+    var old = d.querySelectorAll('.panel, .dots');
     for (var o = 0; o < old.length; o++) d.removeChild(old[o]);
-    var br = Data.brRows(), us = Data.usRows();
-    var list = [];
-    if (Prefs.weather()) list.push({id: 'weather', w: 410, draw: renderWeather});
-    if (br.length) list.push({id: 'prices', w: 390, draw: function (c) { renderPrices(c, Data.brRows()); }});
-    if (us.length) list.push({id: 'usmarket', w: 420, draw: renderUS});
-    if (Prefs.team()) list.push({id: 'team', w: 500, draw: renderTeam});
-    var gap = 16, total = 0, k;
+    var pages = panelPages();
+    if (!pages.length) return;
+    panelPage = panelPage % pages.length;
+    var list = pages[panelPage], gap = 16, total = 0, k;
     for (k = 0; k < list.length; k++) total += list[k].w;
     var space = 1760 - gap * (list.length - 1), x = 80;
     for (k = 0; k < list.length; k++) {
@@ -573,6 +590,17 @@
       list[k].draw(card);
       x += width + gap;
     }
+    if (pages.length > 1) {
+      var dots = el('div', 'dots', d);
+      for (var i = 0; i < pages.length; i++) el('span', i === panelPage ? 'on' : '', dots);
+    }
+  }
+
+  function nextPage(step) {
+    var n = panelPages().length;
+    if (n < 2) return;
+    panelPage = (panelPage + (step || 1) + n) % n;
+    renderPanels();
   }
 
   function renderWeather(card) {
@@ -617,16 +645,18 @@
     }
   }
 
-  function renderUS(card) {
-    var rows = Data.usRows();
-    el('div', 'head', card, 'Mercado EUA');
+  /** A card of lines {name, text, change}: name on the left, value, and the change as a pill when there is one. */
+  function renderRows(card, head, side, rows) {
+    el('div', 'head', card, head);
+    if (side) el('div', 'side', card, side);
     for (var j = 0; j < rows.length; j++) {
       var row = el('div', 'coin', card);
       row.style.top = (80 + 50 * j) + 'px';
       el('span', 'n', row, rows[j].name);
-      el('span', 'p', row, rows[j].text);
+      var p = el('span', 'p', row, rows[j].text);
       var ch = rows[j].change;
       if (!isNaN(ch)) el('span', 'c ' + (ch >= 0 ? 'up' : 'down'), row, Data.change(ch));
+      else p.style.right = '0';
     }
   }
 
@@ -674,6 +704,36 @@
         y += 38;
       }
     }
+  }
+
+  function renderDeadlines(card) {
+    el('div', 'head', card, 'Prazos fiscais');
+    el('div', 'side', card, 'datas calculadas');
+    var list = Data.deadlines(4);
+    for (var j = 0; j < list.length; j++) {
+      var x = list[j], row = el('div', 'coin due', card), d = new Date(x.at);
+      row.style.top = (80 + 50 * j) + 'px';
+      var n = el('span', 'n', row, x.name);
+      el('span', 'm', n, ' ' + x.comp);
+      el('span', 'p', row, WEEK[d.getDay()] + ' ' + pad(d.getDate()) + '/' + pad(d.getMonth() + 1));
+      el('span', 'c ' + (x.days <= 3 ? 'down' : x.days <= 7 ? 'warn' : 'calm'), row,
+        x.days === 0 ? 'hoje' : x.days === 1 ? 'amanhã' : 'em ' + x.days + ' d');
+    }
+  }
+
+  function renderTraffic(card) {
+    var t = Data.traffic;
+    el('div', 'head', card, 'Trânsito');
+    if (!t) { el('div', 'cond', card, 'Carregando a rota…').style.top = '96px'; return; }
+    el('div', 'side', card, t.out ? 'Casa → Trabalho' : 'Trabalho → Casa');
+    var big = el('div', 'bigtime', card);
+    el('span', '', big, String(t.minutes));
+    el('small', '', big, ' min');
+    var free = Math.max(1, t.minutes - t.delay), ratio = t.delay / free;
+    var level = ratio < 0.1 ? 'Livre' : ratio < 0.25 ? 'Moderado' : 'Pesado';
+    el('div', 'tstate ' + (ratio < 0.1 ? 'up' : ratio < 0.25 ? 'warn' : 'down'), card, level);
+    el('div', 'tline', card, t.delay > 0 ? '+' + t.delay + ' min por causa do trânsito' : 'Sem atraso de trânsito');
+    el('div', 'tline', card, String(t.km.toFixed(1)).replace('.', ',') + ' km').style.top = '248px';
   }
 
   function openDrawer() {
@@ -744,6 +804,8 @@
         step: function () { Prefs.set('quotes', !Prefs.quotes()); Data.settingsChanged(); }},
       {label: 'Mercado EUA', toggle: Prefs.us(),
         step: function () { Prefs.set('us', !Prefs.us()); renderPanels(); }},
+      {label: 'Economia e prazos', toggle: Prefs.page2(),
+        step: function () { Prefs.set('page2', !Prefs.page2()); Data.settingsChanged(); renderPanels(); }},
       {label: 'Palmeiras', toggle: Prefs.team(),
         step: function () { Prefs.set('team', !Prefs.team()); Data.settingsChanged(); renderPanels(); }}
     ];
@@ -1168,6 +1230,8 @@
     else if (k === TV.keys.down) move(0, 1);
     else if (k === TV.keys.ok) activate();
     else if (k === TV.keys.back || k === 27 || k === 8) back();
+    else if (k === 49 || k === 34) nextPage(1);
+    else if (k === 50 || k === 33) nextPage(-1);
     else return;
     e.preventDefault();
   });
@@ -1225,6 +1289,8 @@
     renderSaverInfo();
     checkNight();
   });
+
+  pageTimer = setInterval(function () { if (st.zone === Z.DRAWER) nextPage(1); }, 18000);
 
   Data.onRotate(function () {
     renderQuotes();

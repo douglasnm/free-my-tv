@@ -58,6 +58,10 @@ def read_config(path):
         'temperature': values.get('temperature', 'auto') or 'auto',
         'showCrypto': values.get('show_crypto', 'true').lower() != 'false',
         'hideAnimation': values.get('hide_animation', 'false').lower() == 'true',
+        'trafficKey': values.get('traffic_key', ''),
+        'home': values.get('home', ''),
+        'work': values.get('work', ''),
+        'deadlines': [s.strip() for s in values.get('deadlines', 'das,fgts,esocial,dctf,efd,darfrv').split(',') if s.strip()],
         'hideApps': [s.strip() for s in values.get('hide_apps', '').split(',') if s.strip()],
         'shelfApps': [s.strip() for s in values.get('shelf_apps', '').split(',') if s.strip()],
     }

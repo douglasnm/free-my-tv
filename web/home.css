@@ -449,6 +449,25 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .night .panel .game .r.loss { color: #FF453A; background: rgba(255, 69, 58, 0.2); }
 .night .panel .game .r.draw { color: rgba(255, 255, 255, 0.7); background: rgba(255, 255, 255, 0.14); }
 .night .panel .game.live .d { color: #FF453A; }
+.panel .coin.due .m { font-size: 19px; font-weight: 500; color: #8E8E93; }
+.panel .coin.due .p { right: 120px; font-size: 22px; }
+.panel .coin.due .c { width: 100px; }
+.panel .c.warn { color: #B25000; background: rgba(255, 149, 0, 0.2); }
+.panel .c.calm { color: #6E6E73; background: rgba(110, 110, 115, 0.16); }
+.night .panel .c.warn { color: #FFB340; background: rgba(255, 159, 10, 0.18); }
+.night .panel .c.calm { color: rgba(255, 255, 255, 0.66); background: rgba(255, 255, 255, 0.1); }
+.night .panel .coin.due .m { color: rgba(255, 255, 255, 0.5); }
+.panel .bigtime { position: absolute; left: 34px; top: 74px; font-size: 118px; font-weight: 300; line-height: 130px; font-feature-settings: 'tnum'; white-space: nowrap; }
+.panel .bigtime small { font-size: 36px; font-weight: 500; color: #6E6E73; }
+.night .panel .bigtime small { color: rgba(255, 255, 255, 0.6); }
+.panel .tstate { position: absolute; right: 34px; top: 100px; padding: 0 22px; height: 40px; line-height: 40px; border-radius: 20px; font-size: 24px; font-weight: 600; }
+.panel .tline { position: absolute; left: 34px; top: 212px; font-size: 24px; font-weight: 500; color: #6E6E73; white-space: nowrap; }
+.night .panel .tline { color: rgba(255, 255, 255, 0.66); }
+.panel .tstate.warn { color: #B25000; background: rgba(255, 149, 0, 0.2); }
+.night .panel .tstate.warn { color: #FFB340; background: rgba(255, 159, 10, 0.18); }
+.dots { position: absolute; left: 0; right: 0; top: 1034px; text-align: center; }
+.dots span { display: inline-block; width: 10px; height: 10px; margin: 0 7px; border-radius: 5px; background: rgba(255, 255, 255, 0.25); }
+.dots span.on { background: rgba(255, 255, 255, 0.85); }
 
 /* MARK: - Sheets over the home screen: All Apps, Settings, Shelf */
 

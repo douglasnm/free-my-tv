@@ -48,6 +48,7 @@ var Prefs = (function () {
     theme: function () { return pick('theme', 'dark'); },
     weather: function () { return pick('weather', true); },
     us: function () { return pick('us', true); },
+    page2: function () { return pick('page2', true); },
     team: function () { return pick('team', true); },
     quotes: function () { return pick('quotes', CONFIG.showCrypto !== false); },
     coin: function (i) { var c = pick('coins', null); return c ? c[i] !== false : true; },
@@ -321,6 +322,157 @@ var Data = (function () {
     }
     get(base, {}, take);
     get(base + '?fixture=true', {}, take);
+  }
+
+  // MARK: - Economia (Banco Central: Selic e IPCA; AwesomeAPI: bitcoin)
+
+  var eco = {at: 0, selic: null, ipca: null, ipcaMonth: '', ipca12: null, btc: null}, fetchingEco = false;
+  (function () { var e = stored('economy'); if (e && e.at) eco = e; })();
+  var MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+  function refreshEconomy() {
+    var now = Date.now();
+    if (!Prefs.page2() || fetchingEco || (now - eco.at < 30 * 60000 && now >= eco.at)) return;
+    fetchingEco = true;
+    var pending = 4, got = false, next = {at: 0, selic: eco.selic, ipca: eco.ipca, ipcaMonth: eco.ipcaMonth, ipca12: eco.ipca12, btc: eco.btc};
+    function done() {
+      if (--pending) return;
+      fetchingEco = false;
+      if (!got) return;
+      next.at = Date.now();
+      eco = next;
+      store('economy', eco);
+      changed();
+    }
+    function bcb(serie, fn) {
+      get('https://api.bcb.gov.br/dados/serie/bcdata.sgs.' + serie + '/dados/ultimos/1?formato=json', {}, function (err, o) {
+        try { var v = parseFloat(o[0].valor); if (!isNaN(v)) { fn(v, o[0].data); got = true; } } catch (e) {}
+        done();
+      });
+    }
+    bcb(432, function (v) { next.selic = v; });
+    bcb(433, function (v, d) { next.ipca = v; next.ipcaMonth = MONTHS[parseInt(d.slice(3, 5), 10) - 1] || ''; });
+    bcb(13522, function (v) { next.ipca12 = v; });
+    get('https://economia.awesomeapi.com.br/json/last/BTC-BRL', {}, function (err, o) {
+      try { var b = o.BTCBRL, v = parseFloat(b.bid); if (!isNaN(v)) { next.btc = [v, parseFloat(b.pctChange)]; got = true; } } catch (e) {}
+      done();
+    });
+  }
+
+  function pct(v) { return v === null ? '—' : fmt(v, 2) + '%'; }
+
+  /** The economy card: Selic, IPCA of the last month, IPCA over 12 months, and bitcoin. */
+  function economyRows() {
+    return [
+      {name: 'Selic (meta)', text: eco.selic === null ? '—' : fmt(eco.selic, 2) + '% a.a.', change: NaN},
+      {name: 'IPCA' + (eco.ipcaMonth ? ' ' + eco.ipcaMonth : ''), text: pct(eco.ipca), change: NaN},
+      {name: 'IPCA 12 meses', text: pct(eco.ipca12), change: NaN},
+      {name: 'Bitcoin', text: eco.btc ? 'R$ ' + fmt(eco.btc[0], 0) : '—', change: eco.btc ? eco.btc[1] : NaN}
+    ];
+  }
+
+  // MARK: - Prazos fiscais (calculated here: no service involved)
+
+  function easter(y) {
+    var a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+    var g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4;
+    var l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+    var month = Math.floor((h + l - 7 * m + 114) / 31), day = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(y, month - 1, day);
+  }
+
+  var holidayCache = {};
+  /** Days the banks are closed: national holidays, Carnival, Good Friday and Corpus Christi. */
+  function holidays(y) {
+    if (holidayCache[y]) return holidayCache[y];
+    var out = {}, fixed = [[0, 1], [3, 21], [4, 1], [8, 7], [9, 12], [10, 2], [10, 15], [10, 20], [11, 25]], e = easter(y);
+    for (var i = 0; i < fixed.length; i++) out[fixed[i][0] + '-' + fixed[i][1]] = true;
+    [-48, -47, -2, 60].forEach(function (n) { var d = new Date(y, e.getMonth(), e.getDate() + n); out[d.getMonth() + '-' + d.getDate()] = true; });
+    return (holidayCache[y] = out);
+  }
+  function isBusiness(d) { var w = d.getDay(); return w !== 0 && w !== 6 && !holidays(d.getFullYear())[d.getMonth() + '-' + d.getDate()]; }
+  /** The date itself if it's a business day, else the next (dir 1) or the previous (dir -1) one. */
+  function shift(date, dir) {
+    var d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    while (!isBusiness(d)) d.setDate(d.getDate() + dir);
+    return d;
+  }
+  function nthBusiness(y, m, n) {
+    var d = new Date(y, m, 1), count = 0;
+    for (;;) { if (isBusiness(d) && ++count === n) return d; d.setDate(d.getDate() + 1); }
+  }
+
+  /** Rule of each deadline, for the month it falls in (m): its date, and how many months back its competence is. */
+  var DUES = {
+    das: {name: 'DAS', back: 1, due: function (y, m) { return shift(new Date(y, m, 20), 1); }},             // prorroga para o dia útil seguinte
+    fgts: {name: 'FGTS', back: 1, due: function (y, m) { return shift(new Date(y, m, 20), -1); }},         // antecipa para o dia útil anterior
+    esocial: {name: 'eSocial fechamento', back: 1, due: function (y, m) { return shift(new Date(y, m, 15), -1); }},
+    dctf: {name: 'DCTF', back: 2, due: function (y, m) { return nthBusiness(y, m, 15); }},                 // 15º dia útil do 2º mês seguinte
+    efd: {name: 'EFD-Contribuições', back: 2, due: function (y, m) { return nthBusiness(y, m, 10); }},     // 10º dia útil do 2º mês seguinte
+    darfrv: {name: 'DARF renda variável', back: 1, due: function (y, m) { return shift(new Date(y, m + 1, 0), -1); }}   // último dia útil do mês seguinte
+  };
+
+  /** The next deadlines from today, soonest first: [{name, comp, at, days}]. */
+  function deadlines(count) {
+    var keys = CONFIG.deadlines && CONFIG.deadlines.length ? CONFIG.deadlines : ['das', 'fgts', 'esocial', 'dctf', 'efd', 'darfrv'];
+    var now = new Date(), today = new Date(now.getFullYear(), now.getMonth(), now.getDate()), out = [];
+    for (var k = 0; k < keys.length; k++) {
+      var rule = DUES[keys[k]];
+      if (!rule) continue;
+      for (var step = -1; step <= 3; step++) {
+        var base = new Date(today.getFullYear(), today.getMonth() + step, 1);
+        var due = rule.due(base.getFullYear(), base.getMonth());
+        if (due < today) continue;
+        var comp = new Date(base.getFullYear(), base.getMonth() - rule.back, 1);
+        out.push({name: rule.name, comp: MONTHS[comp.getMonth()] + '/' + String(comp.getFullYear()).slice(2), at: due.getTime(),
+          days: Math.round((due - today) / 86400000)});
+      }
+    }
+    out.sort(function (a, b) { return a.at - b.at; });
+    return out.slice(0, count);
+  }
+
+  // MARK: - Trânsito (TomTom: a free key; the addresses come from config.properties, never from the public release)
+
+  var TRAFFIC_KEY = (CONFIG.trafficKey || '').trim();
+  var traffic = stored('traffic'), fetchingTraffic = false;
+  function trafficOn() { return !!(TRAFFIC_KEY && CONFIG.home && CONFIG.work); }
+
+  function geocode(address, done) {
+    var cache = stored('geocache') || {};
+    if (cache[address]) { done(cache[address]); return; }
+    get('https://api.tomtom.com/search/2/geocode/' + encodeURIComponent(address) + '.json?key=' + TRAFFIC_KEY + '&limit=1&countrySet=BR', {}, function (err, o) {
+      try {
+        var p = o.results[0].position;
+        cache[address] = p.lat + ',' + p.lon;
+        store('geocache', cache);
+        done(cache[address]);
+      } catch (e) { done(null); }
+    });
+  }
+
+  function refreshTraffic() {
+    var now = Date.now();
+    if (!trafficOn() || !Prefs.page2() || fetchingTraffic || (traffic && now - traffic.at < 5 * 60000 && now >= traffic.at)) return;
+    fetchingTraffic = true;
+    var out = new Date().getHours() < 14;   // morning: to work; afternoon on: back home
+    var from = out ? CONFIG.home : CONFIG.work, to = out ? CONFIG.work : CONFIG.home;
+    geocode(from, function (a) {
+      if (!a) { fetchingTraffic = false; return; }
+      geocode(to, function (b) {
+        if (!b) { fetchingTraffic = false; return; }
+        get('https://api.tomtom.com/routing/1/calculateRoute/' + a + ':' + b + '/json?key=' + TRAFFIC_KEY + '&traffic=true&departAt=now', {}, function (err, o) {
+          fetchingTraffic = false;
+          try {
+            var m = o.routes[0].summary;
+            traffic = {out: out, minutes: Math.round(m.travelTimeInSeconds / 60), delay: Math.round((m.trafficDelayInSeconds || 0) / 60),
+              km: m.lengthInMeters / 1000, at: Date.now()};
+            store('traffic', traffic);
+            changed();
+          } catch (e) {}
+        });
+      });
+    });
   }
 
   // MARK: - Picks (TMDB)
@@ -633,7 +785,7 @@ var Data = (function () {
     onChange: function (fn) { listeners.push(fn); },
     setApps: function (apps) { installed = apps; },
     appFor: appFor,
-    refresh: function () { refreshWeather(); refreshPrices(); refreshTeam(); refreshRecs(); },
+    refresh: function () { refreshWeather(); refreshPrices(); refreshTeam(); refreshEconomy(); refreshTraffic(); refreshRecs(); },
     settingsChanged: function () { pricesAt = 0; refreshPrices(); changed(); },
     get weather() { return weather; },
     get weatherAt() { return weatherAt; },
@@ -643,6 +795,10 @@ var Data = (function () {
     activeCoins: activeCoins,
     brRows: brRows,
     usRows: usRows,
+    economyRows: economyRows,
+    deadlines: deadlines,
+    trafficOn: trafficOn,
+    get traffic() { return traffic; },
     get team() { return team; },
     hasKey: function () { return !!KEY; },
     recsError: function () { return recsError; },
